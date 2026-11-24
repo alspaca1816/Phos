@@ -1,0 +1,58 @@
+# render.yaml — Blueprint de despliegue de Phos en Render.
+#
+# Uso (una sola vez): Render Dashboard → New → Blueprint → selecciona este
+# repositorio. Render lee este archivo y crea el servicio ya configurado.
+# También puedes crear el servicio a mano con los mismos valores (ver README).
+#
+# Todas las variables van con `sync: false`: sus valores se rellenan UNA VEZ
+# en el panel de Render (Environment), nunca en este archivo, porque el
+# repositorio es público y varias de ellas son secretos.
+
+services:
+  - type: web            # Web Service: es el único tipo con plan gratuito.
+    name: phos
+    runtime: python
+    plan: free
+    region: oregon       # el más cercano a tus usuarios (frankfurt para Europa)
+    buildCommand: pip install -r requirements.txt
+    startCommand: python start.py
+    healthCheckPath: /health
+    autoDeploy: true     # re desplegar en cada push a la rama principal
+    envVars:
+      # --- Obligatoria ---
+      - key: DISCORD_TOKEN
+        sync: false
+      # --- Spotify ---
+      - key: SPOTIPY_CLIENT_ID
+        sync: false
+      - key: SPOTIPY_CLIENT_SECRET
+        sync: false
+      - key: SPOTIPY_REDIRECT_URI
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
+      - key: PLAYLIST_ID
+        sync: false
+      - key: EMOJI_SUCCESS_ID
+        sync: false
+      - key: EMOJI_DUPLICATE_ID
+        sync: false
+      - key: EMOJI_ERROR_ID
+        sync: false
+      - key: EMOJI_WARNING_ID
+        sync: false
+      - key: SPOTIPY_CACHE_JSON
+        sync: false
+      # --- Aternos ---
+      - key: ATERNOS_SESSION
+        sync: false
+      - key: ATERNOS_SERVER_ID
+        sync: false
+      # --- Minecraft / otros ---
+      - key: MC_ADDRESS
+        sync: false
+      - key: PREFIX
+        sync: false
+      - key: GUILD_ID
+        sync: false
+      # NOTA: PORT lo define Render automáticamente; no lo pongas aquí.

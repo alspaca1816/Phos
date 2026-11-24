@@ -1,0 +1,23 @@
+# Dependencias de Phos.
+# Versiones probadas en el despliegue de referencia (noviembre de 2026);
+# se admite cualquier parche dentro de la misma serie mayor.menor.
+
+# Bot de Discord (discord.py incluye aiohttp).
+discord.py>=2.3,<3
+
+# Carga del .env local en desarrollo.
+python-dotenv>=1.0,<2
+
+# Servidor web (/health) para Render y UptimeRobot.
+Flask>=3.0,<4
+waitress>=3.0,<4
+
+# Integración con Spotify.
+spotipy>=2.24,<3
+
+# Cliente del panel de Aternos (cloudscraper pasa el reto de Cloudflare).
+cloudscraper>=1.2.71,<2
+requests>=2.31,<3
+
+# Ping directo al servidor de Minecraft (presencia del bot).
+mcstatus>=11,<16

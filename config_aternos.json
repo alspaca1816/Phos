@@ -1,0 +1,7 @@
+{
+  "roles_pueden_encender": ["Azumanguero", "Moderador", "Haru_w", "Poemas_Azumanga", "Alspaca"],
+  "roles_pueden_apagar": ["Moderador", "Haru_w", "Poemas_Azumanga", "Alspaca"],
+  "roles_pueden_reiniciar": ["Moderador", "Haru_w", "Poemas_Azumanga", "Alspaca"],
+  "roles_pueden_ver_ip": ["Moderador", "Haru_w", "Poemas_Azumanga", "Alspaca"],
+  "presencia_minutos": 2
+}

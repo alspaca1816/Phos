@@ -14,6 +14,19 @@ del bot (no puede haber dos `discord.Client` a la vez). El comportamiento:
   SUCCESS = añadida · DUPLICATE = ya estaba · ERROR = no encontrada ·
   WARNING = fallo inesperado.
 
+Autenticación (v2, para el despliegue en Render):
+- En LOCAL funciona igual que siempre (SpotifyOAuth: abre el navegador la
+  primera vez y luego usa el .cache).
+- En un SERVIDOR no hay navegador: el error "Server listening on localhost
+  has not been accessed" de spotipy es exactamente eso. La solución es
+  definir SPOTIFY_REFRESH_TOKEN en el .env/entorno: el bot renueva el
+  access token solo (sin navegador ni .cache). Ese refresh token se genera
+  UNA VEZ en tu PC con el script obtener_refresh_token.py y no caduca
+  mientras no revoques el acceso a la app.
+- Ojo: esto NO requiere cuenta Premium. Buscar canciones y añadirlas a
+  playlists funciona con cuenta gratuita; el error anterior era del
+  navegador ausente, no del tipo de cuenta.
+
 Mejoras respecto al original (sin cambiar el comportamiento visible):
 - Las llamadas a Spotify ya no bloquean el event loop del bot
   (asyncio.to_thread), así los comandos de Aternos no se tarden.
@@ -27,6 +40,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from typing import Any, Optional
 
 import discord
@@ -34,13 +48,72 @@ import requests
 import spotipy
 from discord.ext import commands
 from dotenv import load_dotenv
+from spotipy.cache_handler import MemoryCacheHandler
 from spotipy.oauth2 import SpotifyOAuth
 
 log = logging.getLogger('phos.spotify')
 
+SCOPES = 'playlist-modify-public playlist-modify-private'
+
 
 def _emoji(nombre_env: str) -> discord.PartialEmoji:
     return discord.PartialEmoji(name='e', id=int(os.environ[nombre_env]))
+
+
+class _AuthPorRefreshToken:
+    """Auth manager de Spotify que parte de un REFRESH TOKEN.
+
+    Pensado para el servidor (Render): no hay navegador ni archivo .cache
+    ahí, así que el flujo interactivo de spotipy no puede completarse. Con
+    un refresh token (generado una vez en local con
+    obtener_refresh_token.py) este manager renueva el access token
+    automáticamente cada hora, sin interacción.
+
+    Implementa la interfaz que spotipy espera de un auth_manager
+    (get_access_token) y la que usa este cog.
+    """
+
+    def __init__(self, client_id: str, client_secret: str,
+                 refresh_token: str) -> None:
+        # SpotifyOAuth "mudo": se usa solo por su método refresh_access_token
+        # (cabeceras y endpoint correctos). Sin navegador y sin .cache en
+        # disco (MemoryCacheHandler).
+        self._oauth = SpotifyOAuth(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=os.environ.get(
+                'SPOTIPY_REDIRECT_URI', 'http://127.0.0.1:8888/callback'),
+            scope=SCOPES,
+            open_browser=False,
+            cache_handler=MemoryCacheHandler(),
+        )
+        self._refresh = refresh_token
+        self._token: Optional[str] = None
+        self._expira = 0.0
+
+    def _renovar(self) -> None:
+        info = self._oauth.refresh_access_token(self._refresh)
+        # Spotify puede devolver un refresh_token nuevo (rotación): adoptarlo.
+        if info.get('refresh_token'):
+            self._refresh = info['refresh_token']
+        self._token = info['access_token']
+        self._expira = time.time() + int(info.get('expires_in', 3600))
+        log.info('Access token de Spotify renovado (válido %s s).',
+                 info.get('expires_in', 3600))
+
+    def get_access_token(self, as_dict: bool = True):
+        """Token vigente; lo renueva 60 s antes de caducar."""
+        if self._token is None or time.time() > self._expira - 60:
+            self._renovar()
+        if as_dict:
+            return {
+                'access_token': self._token,
+                'token_type': 'Bearer',
+                'expires_at': int(self._expira),
+                'scope': SCOPES,
+                'refresh_token': self._refresh,
+            }
+        return self._token
 
 
 class SpotifyCog(commands.Cog, name='Spotify'):
@@ -64,18 +137,29 @@ class SpotifyCog(commands.Cog, name='Spotify'):
         self.emoji_exito = _emoji('EMOJI_SUCCESS_ID')
         self.emoji_aviso = _emoji('EMOJI_WARNING_ID')
 
-        self.auth = SpotifyOAuth(
-            scope='playlist-modify-public playlist-modify-private',
-        )
+        refresh_token = os.environ.get('SPOTIFY_REFRESH_TOKEN') or None
+        if refresh_token:
+            # Modo servidor (Render): sin navegador, sin .cache.
+            self.auth: Any = _AuthPorRefreshToken(
+                os.environ['SPOTIPY_CLIENT_ID'],
+                os.environ.get('SPOTIPY_CLIENT_SECRET', ''),
+                refresh_token,
+            )
+            modo = 'refresh token (modo servidor, sin navegador)'
+        else:
+            # Modo local (comportamiento original): navegador la primera
+            # vez y luego el archivo .cache.
+            self.auth = SpotifyOAuth(scope=SCOPES)
+            modo = 'OAuth interactivo (modo local, usa .cache)'
         self.sp = spotipy.Spotify(auth_manager=self.auth)
         # URIs añadidas desde que el bot está encendido (como en el original;
         # se pierde al reiniciar el bot)
         self.ya_añadidas: set[str] = set()
 
         log.info(
-            'Módulo Spotify listo (canal %s, playlist %s). '
+            'Módulo Spotify listo (canal %s, playlist %s, %s). '
             'Formato requerido: "Nombre - Autor".',
-            self.channel_id, self.playlist_id,
+            self.channel_id, self.playlist_id, modo,
         )
 
     # ------------------------------------------------------------------

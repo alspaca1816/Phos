@@ -1,6 +1,6 @@
-# Dependencias de Phos.
-# Versiones probadas en el despliegue de referencia (noviembre de 2026);
-# se admite cualquier parche dentro de la misma serie mayor.menor.
+# Dependencias de Phos (v5 — fix Render, 2026-11-24).
+# Versiones probadas en el despliegue de referencia; se admite cualquier
+# parche dentro de la misma serie mayor.menor.
 
 # Bot de Discord (discord.py incluye aiohttp).
 discord.py>=2.3,<3
@@ -15,7 +15,15 @@ waitress>=3.0,<4
 # Integración con Spotify.
 spotipy>=2.24,<3
 
-# Cliente del panel de Aternos (cloudscraper pasa el reto de Cloudflare).
+# Cliente del panel de Aternos.
+# NOVEDAD v5: curl_cffi presenta la huella TLS/HTTP2 de un Chrome real,
+# que es lo que permite pasar el filtro de Cloudflare desde las IPs de
+# datacenter de Render. Funciona en Windows, Linux y Python 3.9+ (wheels
+# abi3, incluido el 3.14 de Render).
+curl_cffi>=0.13,<0.18
+
+# cloudscraper queda como RESPALDO automático si curl_cffi faltara
+# (comportamiento de la v4) y para entornos sin curl_cffi.
 cloudscraper>=1.2.71,<2
 requests>=2.31,<3
 
